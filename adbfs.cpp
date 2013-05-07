@@ -76,6 +76,10 @@
 
 #include <execinfo.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 
 void handler(int sig) {
   void *array[10];
@@ -99,8 +103,8 @@ queue<string> adb_push(const string&, const string&);
 queue<string> adb_pull(const string&, const string&);
 queue<string> adb_shell(const string&);
 queue<string> shell(const string&);
-void clearTmpDir();
 
+string tempDirPath;
 map<string,fileCache> fileData;
 void invalidateCache(const string& path) {
     cout << "invalidate cache " << path << endl;    
@@ -206,13 +210,22 @@ void shell_escape_path(string &path)
 }
 
 /**
-   Recursively delete /tmp/adbfs on the local host and then recreate
-   it with 0755 permissions flags.
-   @todo Should probably use mkstemp or friends.
+   Make a secure temporary directory for each mounted filesystem. Use with
+   ANDROID_SERIAL environment variable to mount multiple phones at once.
+
+   Also set up a callback to cleanup after ourselves on clean shutdown.
  */
-void clearTmpDir(){
-    shell("rm -rf /tmp/adbfs");
-    mkdir("/tmp/adbfs/",0755);
+void cleanupTmpDir(void) {
+    string command = "rm -rf ";
+    command.append(tempDirPath);
+    shell(command);
+}
+
+void makeTmpDir(void) {
+    char adbfsTemplate[]="/tmp/adbfs-XXXXXX";
+    tempDirPath.assign(mkdtemp(adbfsTemplate));
+    tempDirPath.append("/");
+    atexit(&cleanupTmpDir);
 }
 
 /**
@@ -283,20 +296,39 @@ queue<string> adb_push(const string& local_source,
 
 int strmode_to_rawmode(const string& str) {
     int fmode = 0;
-    if (str[0] == 'd') fmode += 040000;
-    else fmode += 0100000;
+    switch (str[0]) {
+    case 's': fmode |= S_IFSOCK; break;
+    case 'l': fmode |= S_IFLNK; break;
+    case '-': fmode |= S_IFREG; break;
+    case 'd': fmode |= S_IFDIR; break;
+    case 'b': fmode |= S_IFBLK; break;
+    case 'c': fmode |= S_IFCHR; break;
+    case 'p': fmode |= S_IFIFO; break;
+    }
    
-    if (str[1] == 'r') fmode += 0400;
-    if (str[2] == 'w') fmode += 0200;
-    if (str[3] == 'x') fmode += 0100;
+    if (str[1] == 'r') fmode |= S_IRUSR;
+    if (str[2] == 'w') fmode |= S_IWUSR;
+    switch (str[3]) {
+    case 'x': fmode |= S_IXUSR; break;
+    case 's': fmode |= S_ISUID | S_IXUSR; break;
+    case 'S': fmode |= S_ISUID; break;
+    }
 
-    if (str[4] == 'r') fmode += 040;
-    if (str[5] == 'w') fmode += 020;
-    if (str[6] == 'x') fmode += 010;
+    if (str[4] == 'r') fmode |= S_IRGRP;
+    if (str[5] == 'w') fmode |= S_IWGRP;
+    switch (str[6]) {
+    case 'x': fmode |= S_IXGRP; break;
+    case 's': fmode |= S_ISGID | S_IXGRP; break;
+    case 'S': fmode |= S_ISGID; break;
+    }
     
-    if (str[7] == 'r') fmode += 04;
-    if (str[8] == 'w') fmode += 02;
-    if (str[9] == 'x') fmode += 01;
+    if (str[7] == 'r') fmode |= S_IROTH;
+    if (str[8] == 'w') fmode |= S_IWOTH;
+    switch (str[9]) {
+    case 'x': fmode |= S_IXOTH; break;
+    case 't': fmode |= S_ISVTX | S_IXOTH; break;
+    case 'T': fmode |= S_ISVTX; break;
+    }
 
     return fmode;
 
@@ -313,6 +345,8 @@ static int adb_getattr(const char *path, struct stat *stbuf)
 {
 
     int res = 0;
+    struct passwd * foruid;
+    struct group * forgid;
     memset(stbuf, 0, sizeof(struct stat));
     queue<string> output;
     string path_string;
@@ -323,10 +357,11 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     vector<string> output_chunk;
     if (fileData.find(path_string) ==  fileData.end() 
 	|| fileData[path_string].timestamp + 30 < time(NULL)) {
-        string command = "ls -ladn \"";
+        string command = "ls -l -a -d \"";
         command.append(path_string);
         command.append("\"");
         output = adb_shell(command);
+        if (output.empty()) return -EAGAIN; /* no phone */
         output_chunk = make_array(output.front());
         fileData[path_string].statOutput = output_chunk;
         fileData[path_string].timestamp = time(NULL);
@@ -372,27 +407,52 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     stbuf->st_mode = strmode_to_rawmode(output_chunk[0]);
 
     stbuf->st_nlink = 1;   /* number of hard links */
-    stbuf->st_uid = atoi(output_chunk[1].c_str());     /* user ID of owner */
-    stbuf->st_gid = atoi(output_chunk[2].c_str());     /* group ID of owner */
+
+    foruid = getpwnam(output_chunk[1].c_str());
+    if (foruid)
+	    stbuf->st_uid = foruid->pw_uid;     /* user ID of owner */
+    else
+	    stbuf->st_uid = 98; /* 98 has been chosen (poorly) so that it doesn't map to anything */
+
+    forgid = getgrnam(output_chunk[2].c_str());
+    if (forgid)
+	    stbuf->st_gid = forgid->gr_gid;     /* group ID of owner */
+    else
+	    stbuf->st_gid = 98;
 
     //unsigned int device_id;
     //xtoi(output_chunk[6].c_str(),&device_id);
     //stbuf->st_rdev = device_id;    // device ID (if special file)
 
-    stbuf->st_rdev = 801; // regular fucking file or directory
+    int iDate;
 
-    if (output_chunk[0][0] == '-')
-        stbuf->st_size = atoi(output_chunk[3].c_str());    /* total size, in bytes */
-    else 
-        stbuf->st_size = 4096; // single fuking directory
+    switch (stbuf->st_mode & S_IFMT) {
+    case S_IFBLK:
+    case S_IFCHR:
+	    stbuf->st_rdev = atoi(output_chunk[3].c_str()) * 256 + atoi(output_chunk[4].c_str());
+	    stbuf->st_size = 0;
+	    iDate = 5;
+	    break;
+
+	    break;
+
+    case S_IFREG:
+	    stbuf->st_size = atoi(output_chunk[3].c_str());    /* total size, in bytes */
+	    iDate = 4;
+	    break;
+
+    default:
+    case S_IFSOCK:
+    case S_IFIFO:
+    case S_IFLNK:
+    case S_IFDIR:
+	    stbuf->st_size = 0;
+	    iDate = 3;
+	    break;
+    }
 
     stbuf->st_blksize = 0; // TODO: THIS IS SMELLY
     stbuf->st_blocks = 1;
-
-    // Process date and time
-    int iDate =  output_chunk[0][0] == '-' ? 4 
-               : output_chunk[0][0] == 'c' ? 5 
-               : 3;
 
     //for (int k = 0; k < output_chunk.size(); ++k) cout << output_chunk[k] << " ";    
     //cout << endl;
@@ -408,11 +468,12 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     //cout << endl;
     struct tm ftime;
     ftime.tm_year = atoi(ymd[0].c_str()) - 1900;
-    ftime.tm_mon  = atoi(ymd[1].c_str());
+    ftime.tm_mon  = atoi(ymd[1].c_str()) - 1;
     ftime.tm_mday = atoi(ymd[2].c_str());
     ftime.tm_hour = atoi(hm[0].c_str());
     ftime.tm_min  = atoi(hm[1].c_str());
     ftime.tm_sec  = 0;
+    ftime.tm_isdst = -1;
     time_t now = mktime(&ftime);
     //cout << "after mktime" << endl;
 
@@ -450,21 +511,34 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     string path_string;
     string local_path_string;
     path_string.assign(path);
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
 
     queue<string> output;
-    string command = "ls -lan \"";
+    string command = "ls -l -a \"";
     command.append(path_string);
     command.append("\"");
     output = adb_shell(command);
     if (!output.size()) return 0;
+    /* cannot tell between "no phone" and "empty directory" */
     vector<string> output_chunk = make_array(output.front());
-    if (output_chunk.size() > 3 && output.size() < 2){
-        return -ENOENT;
-    }
+    /* The specific error messages we are looking for (from the android source)-
+       (in listdir) "opendir failed, strerror"
+       (in show_total_size) "stat failed on filename, strerror"
+       (in listfile_size) "lstat 'filename' failed: strerror"
+
+       Thus, we can abuse this a little and just make sure that the second
+       character is either "r" or "-", and assume it's an error otherwise.
+
+       It'd be really nice if we could actually take the strerrors and convert
+       them back to codes, but I fear that involves undoing localization.
+    */
+    if (output.front().length() < 3) return -ENOENT;
+    if (output.front().c_str()[1] != 'r' &&
+        output.front().c_str()[1] != '-') return -ENOENT;
+
     while (output.size() > 0) {
         const string& fname_l_t = output.front().substr(54); 
         const string& fname_l = fname_l_t.substr(find_nth(1, " ",fname_l_t));
@@ -491,14 +565,14 @@ static int adb_open(const char *path, struct fuse_file_info *fi)
     string path_string;
     string local_path_string;
     path_string.assign(path);
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
     cout << "-- " << path_string << " " << local_path_string << "\n";
     if (!fileTruncated[path_string]){
         queue<string> output;
-        string command = "ls -ladn \"";
+        string command = "ls -l -a -d \"";
         command.append(path_string);
         command.append("\"");
         cout << command<<"\n";
@@ -508,7 +582,7 @@ static int adb_open(const char *path, struct fuse_file_info *fi)
             return -ENOENT;
         }
         path_string.assign(path);
-        local_path_string.assign("/tmp/adbfs/");
+        local_path_string = tempDirPath;
         string_replacer(path_string,"/","-");
         local_path_string.append(path_string);
         shell_escape_path(local_path_string);
@@ -543,8 +617,6 @@ static int adb_write(const char *path, const char *buf, size_t size, off_t offse
     string path_string;
     string local_path_string;
     path_string.assign(path);
-    //local_path_string.assign("/tmp/adbfs/");
-    //local_path_string.append(path_string);
     shell_escape_path(local_path_string);
 
     int fd = fi->fh; //open(local_path_string.c_str(), O_CREAT|O_RDWR|O_TRUNC);
@@ -565,7 +637,7 @@ static int adb_flush(const char *path, struct fuse_file_info *fi) {
     string path_string;
     string local_path_string;
     path_string.assign(path);
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
@@ -598,7 +670,7 @@ static int adb_utimens(const char *path, const struct timespec ts[2]) {
     string local_path_string;
     path_string.assign(path);
     fileData[path_string].timestamp = fileData[path_string].timestamp + 50;
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
@@ -618,13 +690,13 @@ static int adb_truncate(const char *path, off_t size) {
     string local_path_string;
     path_string.assign(path);
     fileData[path_string].timestamp = fileData[path_string].timestamp + 50;
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
 
     queue<string> output;
-    string command = "ls -ladn \"";
+    string command = "ls -l -a -d \"";
     command.append(path_string);
     command.append("\"");
     cout << command<<"\n";
@@ -647,7 +719,7 @@ static int adb_mknod(const char *path, mode_t mode, dev_t rdev) {
     string path_string;
     string local_path_string;
     path_string.assign(path);
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
@@ -667,7 +739,7 @@ static int adb_mkdir(const char *path, mode_t mode) {
     string local_path_string;
     path_string.assign(path);
     fileData[path_string].timestamp = fileData[path_string].timestamp + 50;
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
@@ -681,7 +753,7 @@ static int adb_mkdir(const char *path, mode_t mode) {
 }
 
 static int adb_rename(const char *from, const char *to) {
-    string local_from_string,local_to_string ="/tmp/adbfs/";
+    string local_from_string,local_to_string = tempDirPath;
 
     local_from_string.append(from);
     local_to_string.append(to);
@@ -702,7 +774,7 @@ static int adb_rmdir(const char *path) {
     string local_path_string;
     path_string.assign(path);
     fileData[path_string].timestamp = fileData[path_string].timestamp + 50;
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
@@ -722,7 +794,7 @@ static int adb_unlink(const char *path) {
     string local_path_string;
     path_string.assign(path);
     fileData[path_string].timestamp = fileData[path_string].timestamp + 50;
-    local_path_string.assign("/tmp/adbfs/");
+    local_path_string = tempDirPath;
     string_replacer(path_string,"/","-");
     local_path_string.append(path_string);
     path_string.assign(path);
@@ -741,7 +813,12 @@ static int adb_readlink(const char *path, char *buf, size_t size)
     string path_string(path);
     string_replacer(path_string,"'","\\'");
     queue<string> output;
-    string command = "ls -l --color=none \"";
+    string command = "ls -l \"";
+    int num_slashes, ii;
+    for (num_slashes = ii = 0; ii < strlen(path); ii++)
+	    if (path[ii] == '/')
+		    num_slashes++;
+    if (num_slashes >= 1) num_slashes--;
     command.append(path_string);
     command.append("\"");
     output = adb_shell(command);
@@ -752,13 +829,21 @@ static int adb_readlink(const char *path, char *buf, size_t size)
     if(pos == string::npos)
        return -EINVAL;
     pos+=4;
-    while(res[pos] == '/')
-       ++pos;
-    size_t my_size = res.size() - pos;
+    size_t my_size = res.size();
+    buf[0] = 0;
+    if (res[pos] == '/') {
+	    while(res[pos] == '/')
+		    ++pos;
+	    my_size += 3 * num_slashes - pos;
+	    if(my_size >= size)
+		    return -ENOSYS;
+	    for (;num_slashes;num_slashes--) {
+		    strncat(buf,"../",size);
+	    }
+    }
     if(my_size >= size)
-       return -ENOSYS;
-    //cout << res << endl << pStart <<endl;
-    memcpy(buf, res.c_str() + pos, my_size+1);
+	    return -ENOSYS;
+    strncat(buf, res.c_str() + pos,size);
     return 0;
 }
 
@@ -776,7 +861,7 @@ static struct fuse_operations adbfs_oper;
 int main(int argc, char *argv[])
 {
     signal(SIGSEGV, handler);   // install our handler
-    clearTmpDir();
+    makeTmpDir();
     memset(&adbfs_oper, sizeof(adbfs_oper), 0);
     adbfs_oper.readdir= adb_readdir;
     adbfs_oper.getattr= adb_getattr;
