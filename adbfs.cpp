@@ -948,10 +948,14 @@ static int adb_chmod(const char* path, mode_t mode)
     char mode_c[4];
     sprintf(mode_c, "%3o", mode&0777);
 
+    string path_string;
+    path_string.assign(path);
+    shell_escape_path(path_string);
+
     string command = "chmod ";
     command.append(mode_c);
     command.append(" ");
-    command.append(path);
+    command.append(path_string);
 
     adb_shell(command);
     invalidateCache(string(path));
@@ -965,16 +969,19 @@ static int adb_chown(const char* path, uid_t uid, gid_t gid)
     sprintf(uid_c, "%i", uid);
     sprintf(gid_c, "%i", gid);
 
+    string path_string;
+    path_string.assign(path);
+    shell_escape_path(path_string);
+
     string command = "chown ";
     command.append(uid_c);
     command.append(".");
     command.append(gid_c);
     command.append(" ");
-    command.append(path);
+    command.append(path_string);
 
     adb_shell(command);
     invalidateCache(string(path));
-
     return 0;
 }
 
