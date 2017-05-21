@@ -164,7 +164,7 @@ queue<string> exec_command(const string& command)
     while ( fgets( buff, sizeof buff, fp ) != NULL && !feof(fp) )
     {
         tmp_string.assign(buff);
-        tmp_string.erase(tmp_string.size()-2);
+        tmp_string.erase(tmp_string.size()-1);
         output.push(tmp_string);
     }
 

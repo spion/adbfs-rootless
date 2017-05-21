@@ -150,7 +150,7 @@ queue<string> adb_shell(const string& command)
     actual_command.assign(command);
     //adb_shell_escape_command(actual_command);
     actual_command.insert(0, "adb shell \"");
-    actual_command.append("\"");
+    actual_command.append("\" 2>/dev/null");
     return exec_command(actual_command);
 }
 
@@ -428,13 +428,13 @@ static int adb_getattr(const char *path, struct stat *stbuf)
 
     stbuf->st_nlink = 1;   /* number of hard links */
 
-    foruid = getpwnam(output_chunk[1].c_str());
+    foruid = getpwnam(output_chunk[2].c_str());
     if (foruid)
 	    stbuf->st_uid = foruid->pw_uid;     /* user ID of owner */
     else
 	    stbuf->st_uid = 98; /* 98 has been chosen (poorly) so that it doesn't map to anything */
 
-    forgid = getgrnam(output_chunk[2].c_str());
+    forgid = getgrnam(output_chunk[3].c_str());
     if (forgid)
 	    stbuf->st_gid = forgid->gr_gid;     /* group ID of owner */
     else
@@ -449,7 +449,7 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     switch (stbuf->st_mode & S_IFMT) {
     case S_IFBLK:
     case S_IFCHR:
-	    stbuf->st_rdev = atoi(output_chunk[3].c_str()) * 256 + atoi(output_chunk[4].c_str());
+	    stbuf->st_rdev = atoi(output_chunk[4].c_str()) * 256 + atoi(output_chunk[4].c_str());
 	    stbuf->st_size = 0;
 	    iDate = 5;
 	    break;
@@ -457,8 +457,8 @@ static int adb_getattr(const char *path, struct stat *stbuf)
 	    break;
 
     case S_IFREG:
-	    stbuf->st_size = atoi(output_chunk[3].c_str());    /* total size, in bytes */
-	    iDate = 4;
+	    stbuf->st_size = atoi(output_chunk[4].c_str());    /* total size, in bytes */
+	    iDate = 5;
 	    break;
 
     default:
@@ -467,7 +467,7 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     case S_IFLNK:
     case S_IFDIR:
 	    stbuf->st_size = 0;
-	    iDate = 3;
+	    iDate = 5;
 	    break;
     }
 
@@ -551,7 +551,8 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
             // we can get e.g. "permission denied" during listing, need to check every line separately
             if (!is_valid_ls_output(output.front())) {
                 // error format: "lstat '//efs' failed: Permission denied"
-                if (!output.front().compare(output.front().length() - sizeof(PERMISSION_ERR_MSG) + 1,
+                if (output.front().length() > sizeof(PERMISSION_ERR_MSG) + 1 &&
+			!output.front().compare(output.front().length() - sizeof(PERMISSION_ERR_MSG) + 1,
                                             sizeof(PERMISSION_ERR_MSG) - 1, PERMISSION_ERR_MSG)) {
                     size_t nameStart = output.front().rfind("/") + 1;
                     const string& fname_l = output.front().substr(nameStart, output.front().find("' ") - nameStart);
