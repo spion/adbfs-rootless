@@ -2,8 +2,9 @@ This variant of adbfs works even WITHOUT having root access (busybox) on your ph
 
 Instructions:
 =============
+**Required Dependancies:** `libfuse-dev, `adb`, git, make.. #TODO
 
-You will need `libfuse-dev` and `adb`. On ubuntu:
+On ubuntu:
     
     sudo apt-get install libfuse-dev android-tools-adb
 
