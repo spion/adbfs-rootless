@@ -919,7 +919,7 @@ static int adb_readlink(const char *path, char *buf, size_t size)
 
     // get the number of slashes in the path
     int num_slashes, ii;
-    for (num_slashes = ii = 0; ii < strlen(path); ii++)
+    for (num_slashes = ii = 0; ii < (int)strlen(path); ii++)
         if (path[ii] == '/')
             num_slashes++;
     if (num_slashes >= 1) num_slashes--;
