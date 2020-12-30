@@ -126,10 +126,12 @@ map<string,bool> fileTruncated;
 
 struct adb_config {
     bool rescan;
+    bool shorttime;
 };
 
 static struct fuse_opt adb_opts[] = {
     { "rescan", offsetof(struct adb_config, rescan), true },
+    { "shorttime", offsetof(struct adb_config, shorttime), true },
     FUSE_OPT_END
 };
 
@@ -229,6 +231,7 @@ void shell_escape_path(string &path)
 {
   string_replacer(path, "'", "'\\''");
   string_replacer(path, "\"", "\\\"");
+//  string_replacer(path, "`", "\\`");
 }
 
 /**
@@ -403,6 +406,7 @@ bool is_valid_ls_output(const string& file) {
      It'd be really nice if we could actually take the strerrors and convert
      them back to codes, but I fear that involves undoing localization.
   */
+  if (file.size() < 2) return false;
   if (file[0] == '/') return false;
   if (file[1] != 'r' && file[1] != '-') return false;
   return true;
@@ -424,7 +428,12 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     vector<string> output_chunk;
     if (fileData.find(path_string) ==  fileData.end()
 	|| fileData[path_string].timestamp + 30 < time(NULL)) {
-        string command = "ls -l -a -d '";
+        string command;
+        if (!adbfs_conf.shorttime) {
+            command  = "ls -ll -a -d '";
+        } else {
+            command = "ls -l -a -d '";
+        }
         command.append(path_string);
         command.append("'");
         output = adb_shell(command, true);
@@ -547,7 +556,12 @@ static int adb_getattr(const char *path, struct stat *stbuf)
 	    ftime.tm_mday = atoi(ymd[2].c_str());
 	    ftime.tm_hour = atoi(hm[0].c_str());
 	    ftime.tm_min  = atoi(hm[1].c_str());
-	    ftime.tm_sec  = 0;
+		if (!adbfs_conf.shorttime) {
+			vector<string> s_ns = make_array(output_chunk[iDate + 1], ".");
+			ftime.tm_sec  = atoi(s_ns[0].c_str());
+		} else {
+			ftime.tm_sec  = 0;
+		}
 	    ftime.tm_isdst = -1;
 	    time_t now = mktime(&ftime);
 	    //cout << "after mktime" << endl;
@@ -595,7 +609,12 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     shell_escape_path(path_string);
 
     queue<string> output;
-    string command = "ls -l -a '";
+    string command;
+    if (!adbfs_conf.shorttime) {
+        command = "ls -ll -a '";
+    } else {
+        command = "ls -l -a '";
+    }
     command.append(path_string);
     command.append("'");
     output = adb_shell(command);
@@ -627,6 +646,11 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
             } else {
                 // Start of filename = `ls -la` time separator + 4
                 size_t nameStart = output.front().find_first_of(":") + 4;
+                if (!adbfs_conf.shorttime) {
+                    nameStart = output.front().find_first_of(":") + 23;
+                } else {
+                    nameStart = output.front().find_first_of(":") + 4;
+                }
                 const string& fname_l = output.front().substr(nameStart);
                 const string fname_n = fname_l.substr(0, fname_l.find(" -> "));
                 cout << "Adding file:" << fname_n <<":" << endl;
@@ -672,6 +696,9 @@ static int adb_open(const char *path, struct fuse_file_info *fi)
         command.append("'");
         cout << command<<"\n";
         output = adb_shell(command);
+        if (output.empty()) {
+            return -ENOENT;
+        }
         vector<string> output_chunk = make_array(output.front());
         if (!is_valid_ls_output(output_chunk[0])) {
           return -ENOENT;
@@ -819,6 +846,9 @@ static int adb_truncate(const char *path, off_t size) {
     command.append("'");
     cout << command << "\n";
     output = adb_shell(command);
+    if (output.empty()) {
+        return -ENOENT;
+    }
     vector<string> output_chunk = make_array(output.front());
     if (output_chunk[0][0] == '/'){
         adb_pull(path_string,local_path_string);
