@@ -82,6 +82,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <time.h>
 
 void handler(int sig) {
   void *array[10];
@@ -127,11 +128,17 @@ map<string,bool> fileTruncated;
 struct adb_config {
     bool rescan;
     bool shorttime;
+    bool nochmod;
+    bool nochown;
+    bool noutimes;
 };
 
 static struct fuse_opt adb_opts[] = {
     { "rescan", offsetof(struct adb_config, rescan), true },
     { "shorttime", offsetof(struct adb_config, shorttime), true },
+    { "nochmod", offsetof(struct adb_config, nochmod), true },
+    { "nochown", offsetof(struct adb_config, nochown), true },
+    { "noutimes", offsetof(struct adb_config, noutimes), true },
     FUSE_OPT_END
 };
 
@@ -557,11 +564,14 @@ static int adb_getattr(const char *path, struct stat *stbuf)
 	    ftime.tm_hour = atoi(hm[0].c_str());
 	    ftime.tm_min  = atoi(hm[1].c_str());
 		if (!adbfs_conf.shorttime) {
-			vector<string> s_ns = make_array(output_chunk[iDate + 1], ".");
+            vector<string> s_ns = make_array(hm[2], ".");
 			ftime.tm_sec  = atoi(s_ns[0].c_str());
+//        for (int k = 0; k <  s_ns.size(); ++k) cout <<  s_ns[k] << " ";
+//        cout << endl;
 		} else {
 			ftime.tm_sec  = 0;
 		}
+
 	    ftime.tm_isdst = -1;
 	    time_t now = mktime(&ftime);
 	    //cout << "after mktime" << endl;
@@ -813,11 +823,23 @@ static int adb_utimens(const char *path, const struct timespec ts[2]) {
 
     shell_escape_path(path_string);
 
-    queue<string> output;
-    string command = "touch '";
-    command.append(path_string);
-    command.append("'");
-    cout << command<<"\n";
+    string command;
+    if (adbfs_conf.noutimes) {
+        command = "touch '";
+        command.append(path_string);
+        command.append("'");
+    } else {
+        char timebuf[32];
+        struct tm _tm;
+        localtime_r(&(ts[1].tv_sec), &_tm);
+        strftime(timebuf, sizeof(timebuf), "%Y%m%d%H%M.%S", &_tm);
+        command = "touch -am -t ";
+        command.append(timebuf);
+        command.append(" '");
+        command.append(path_string);
+        command.append("'");
+    }
+    cout << command <<"\n";
     adb_shell(command);
 
     // If we forgot to mount -o rescan then we can remount and touch to trigger the scan.
@@ -1055,6 +1077,23 @@ static int adb_readlink(const char *path, char *buf, size_t size)
     return 0;
 }
 
+int adb_chmod_stub(const char *path, mode_t mode)
+{
+    (void)path;
+    (void)mode;
+
+    return 0;
+}
+
+int adb_chown_stub(const char *path, uid_t uid, gid_t gid)
+{
+    (void)path;
+    (void)uid;
+    (void)gid;
+
+    return 0;
+}
+
 /**
    Main struct for FUSE interface.
  */
@@ -1087,11 +1126,19 @@ int main(int argc, char *argv[])
     adbfs_oper.rmdir = adb_rmdir;
     adbfs_oper.unlink = adb_unlink;
     adbfs_oper.readlink = adb_readlink;
+
     adb_shell("ls");
 
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
     memset(&adbfs_conf, 0, sizeof(adbfs_conf));
     fuse_opt_parse(&args, &adbfs_conf, adb_opts, NULL);
+
+    if (!adbfs_conf.nochown) {
+        adbfs_oper.chmod = adb_chmod_stub;
+    }
+    if (!adbfs_conf.nochmod) {
+        adbfs_oper.chown = adb_chown_stub;
+    }
 
     return fuse_main(args.argc, args.argv, &adbfs_oper, NULL);
 }

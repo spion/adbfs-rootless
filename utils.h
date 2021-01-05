@@ -173,8 +173,8 @@ queue<string> exec_command(const string& command)
     }
 
     pclose( fp );
-    
-    cout << "output.size(): " << output.size() << "\n";
+
+//    cout << "output.size(): " << output.size() << "\n";
 
     return output;
 }
