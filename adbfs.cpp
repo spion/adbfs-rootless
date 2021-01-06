@@ -701,7 +701,12 @@ static int adb_open(const char *path, struct fuse_file_info *fi)
     cout << "-- adb_open --" << path_string << " " << local_path_string << "\n";
     if (!fileTruncated[path_string]){
         queue<string> output;
-        string command = "ls -l -a -d '";
+        string command;
+        if (!adbfs_conf.shorttime) {
+            command = "ls -ll -a -d '";
+        } else {
+            command = "ls -l -a -d '";
+        }
         command.append(path_string);
         command.append("'");
         cout << command<<"\n";
@@ -863,7 +868,12 @@ static int adb_truncate(const char *path, off_t size) {
 
     queue<string> output;
     cout << "adb_truncate" << endl;
-    string command = "ls -l -a -d '";
+    string command;
+    if (!adbfs_conf.shorttime) {
+        command = "ls -ll -a -d '";
+    } else {
+        command = "ls -l -a -d '";
+    }
     command.append(path_string);
     command.append("'");
     cout << command << "\n";
@@ -1026,7 +1036,12 @@ static int adb_readlink(const char *path, char *buf, size_t size)
 
     if (fileData.find(path_string) ==  fileData.end()
 	|| fileData[path_string].timestamp + 30 < time(NULL)) {
-        string command = "ls -l -a -d '";
+        string command;
+        if (!adbfs_conf.shorttime) {
+            command = "ls -ll -a -d '";
+        } else {
+            command = "ls -l -a -d '";
+        }
         command.append(path_string);
         command.append("'");
         output = adb_shell(command);
