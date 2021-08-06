@@ -534,29 +534,33 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     vector<string> hm = make_array(output_chunk[iDate + 1], ":");
 
 
-    //for (int k = 0; k < ymd.size(); ++k) cout << ymd[k] << " ";
-    //cout << endl;
-    //for (int k = 0; k <  hm.size(); ++k) cout <<  hm[k] << " ";
-    //cout << endl;
-    struct tm ftime;
-    ftime.tm_year = atoi(ymd[0].c_str()) - 1900;
-    ftime.tm_mon  = atoi(ymd[1].c_str()) - 1;
-    ftime.tm_mday = atoi(ymd[2].c_str());
-    ftime.tm_hour = atoi(hm[0].c_str());
-    ftime.tm_min  = atoi(hm[1].c_str());
-    ftime.tm_sec  = 0;
-    ftime.tm_isdst = -1;
-    time_t now = mktime(&ftime);
-    //cout << "after mktime" << endl;
-
-    //long now = time(0);
-
-    stbuf->st_atime = now;   /* time of last access */
-    //stbuf->st_atime = atol(output_chunk[11].c_str());   /* time of last access */
-    stbuf->st_mtime = now;   /* time of last modification */
-    //stbuf->st_mtime = atol(output_chunk[12].c_str());   /* time of last modification */
-    stbuf->st_ctime = now;   /* time of last status change */
-    //stbuf->st_ctime = atol(output_chunk[13].c_str());   /* time of last status change */
+	if (ymd.size() == 3 && hm.size() == 2)
+	{
+			
+	    //for (int k = 0; k < ymd.size(); ++k) cout << ymd[k] << " ";
+	    //cout << endl;
+	    //for (int k = 0; k <  hm.size(); ++k) cout <<  hm[k] << " ";
+	    //cout << endl;
+	    struct tm ftime{};
+	    ftime.tm_year = atoi(ymd[0].c_str()) - 1900;
+	    ftime.tm_mon  = atoi(ymd[1].c_str()) - 1;
+	    ftime.tm_mday = atoi(ymd[2].c_str());
+	    ftime.tm_hour = atoi(hm[0].c_str());
+	    ftime.tm_min  = atoi(hm[1].c_str());
+	    ftime.tm_sec  = 0;
+	    ftime.tm_isdst = -1;
+	    time_t now = mktime(&ftime);
+	    //cout << "after mktime" << endl;
+	
+	    //long now = time(0);
+	
+	    stbuf->st_atime = now;   /* time of last access */
+	    //stbuf->st_atime = atol(output_chunk[11].c_str());   /* time of last access */
+	    stbuf->st_mtime = now;   /* time of last modification */
+	    //stbuf->st_mtime = atol(output_chunk[12].c_str());   /* time of last modification */
+	    stbuf->st_ctime = now;   /* time of last status change */
+	    //stbuf->st_ctime = atol(output_chunk[13].c_str());   /* time of last status change */
+	}
     return res;
 }
 
