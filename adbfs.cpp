@@ -71,7 +71,7 @@
  *      OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 30
 #include "utils.h"
 #include <unistd.h>
 
@@ -419,8 +419,16 @@ bool is_valid_ls_output(const string& file) {
   return true;
 }
 
-static int adb_getattr(const char *path, struct stat *stbuf)
+static void *adb_init(struct fuse_conn_info *conn,
+                        struct fuse_config *cfg)
 {
+	//cfg->auto_cache = 1;
+	return NULL;
+}
+
+static int adb_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi)
+{
+	(void)fi;
     cout << "adb_getattr" << endl;
     int res = 0;
     struct passwd * foruid;
@@ -604,10 +612,11 @@ size_t find_nth(int n, const string& substr, const string& corpus) {
    @todo check shell escaping.
  */
 static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-    off_t offset, struct fuse_file_info *fi)
+    off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags)
 {
     (void) offset;
     (void) fi;
+    (void) flags;
     string path_string;
     string local_path_string;
     path_string.assign(path);
@@ -644,7 +653,7 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                     size_t nameStart = output.front().rfind("/") + 1;
                     const string& fname_l = output.front().substr(nameStart, output.front().find("' ") - nameStart);
                     cout << "Adding file:" << fname_l << ":" << endl;
-                    filler(buf, fname_l.c_str(), NULL, 0);
+                    filler(buf, fname_l.c_str(), NULL, 0, (fuse_fill_dir_flags)0);
                     const string& path_string_c = path_string
                         + (path_string == "/" ? "" : "/") + fname_l;
 
@@ -664,7 +673,7 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                 const string& fname_l = output.front().substr(nameStart);
                 const string fname_n = fname_l.substr(0, fname_l.find(" -> "));
                 cout << "Adding file:" << fname_n <<":" << endl;
-                filler(buf, fname_n.c_str(), NULL, 0);
+                filler(buf, fname_n.c_str(), NULL, 0, (fuse_fill_dir_flags)0);
                 const string path_string_c = path_string
                     + (path_string == "/" ? "" : "/") + fname_n;
 
@@ -821,7 +830,8 @@ static int adb_access(const char *path, int mask) {
     return 0;
 }
 
-static int adb_utimens(const char *path, const struct timespec ts[2]) {
+static int adb_utimens(const char *path, const struct timespec ts[2], struct fuse_file_info *fi) {
+    (void)fi;
     string path_string;
     path_string.assign(path);
     fileData[path_string].timestamp = fileData[path_string].timestamp + 50;
@@ -853,7 +863,8 @@ static int adb_utimens(const char *path, const struct timespec ts[2]) {
     return 0;
 }
 
-static int adb_truncate(const char *path, off_t size) {
+static int adb_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
+    (void)fi;
     string path_string;
     string local_path_string;
     path_string.assign(path);
@@ -939,7 +950,11 @@ static int adb_mkdir(const char *path, mode_t mode) {
     return 0;
 }
 
-static int adb_rename(const char *from, const char *to) {
+static int adb_rename(const char *from, const char *to, unsigned int flags) {
+
+	if(flags != 0)
+		return -EINVAL;
+
     string local_from_string,local_to_string = tempDirPath;
 
     string from_string = string(from), to_string = string(to);
@@ -1104,16 +1119,18 @@ static int adb_statfs(const char *path, struct statvfs *buf)
 	return 0;
 }
 
-int adb_chmod_stub(const char *path, mode_t mode)
+int adb_chmod_stub(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
+    (void)fi;
     (void)path;
     (void)mode;
 
     return 0;
 }
 
-int adb_chown_stub(const char *path, uid_t uid, gid_t gid)
+int adb_chown_stub(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi)
 {
+    (void)fi;
     (void)path;
     (void)uid;
     (void)gid;
@@ -1137,6 +1154,7 @@ int main(int argc, char *argv[])
     signal(SIGSEGV, handler);   // install our handler
     makeTmpDir();
     memset(&adbfs_oper, 0, sizeof(adbfs_oper));
+    adbfs_oper.init = adb_init;
     adbfs_oper.readdir= adb_readdir;
     adbfs_oper.getattr= adb_getattr;
     adbfs_oper.access= adb_access;
