@@ -1092,6 +1092,18 @@ static int adb_readlink(const char *path, char *buf, size_t size)
     return 0;
 }
 
+static int adb_statfs(const char *path, struct statvfs *buf)
+{
+    // refer to sshfs_statfs
+	buf->f_namemax = 255;
+    buf->f_bsize = 4096;
+    buf->f_frsize = buf->f_bsize;
+	buf->f_blocks = buf->f_bfree =  buf->f_bavail =
+		1000ULL * 1024 * 1024 * 1024 / buf->f_frsize;
+	buf->f_files = buf->f_ffree = 1000000000;
+	return 0;
+}
+
 int adb_chmod_stub(const char *path, mode_t mode)
 {
     (void)path;
@@ -1141,6 +1153,7 @@ int main(int argc, char *argv[])
     adbfs_oper.rmdir = adb_rmdir;
     adbfs_oper.unlink = adb_unlink;
     adbfs_oper.readlink = adb_readlink;
+    adbfs_oper.statfs = adb_statfs;
 
     adb_shell("ls");
 
