@@ -176,7 +176,7 @@ queue<string> adb_shell(const string& command, bool getStderr = false)
     actual_command.assign(command);
     //adb_shell_escape_command(actual_command);
     actual_command.insert(0, "adb shell \"");
-    actual_command.append("\"");
+    actual_command.append("\" 2>/dev/null");
     if (getStderr) actual_command.append(" 2>&1");
     return exec_command(actual_command);
 }
