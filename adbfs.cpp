@@ -604,7 +604,7 @@ size_t find_nth(int n, const string& substr, const string& corpus) {
         p = corpus.find_first_not_of(substr, p);
     }
     return p;
-}
+};
 
 
 /**
@@ -1121,6 +1121,7 @@ static int adb_statfs(const char *path, struct statvfs *buf)
 
 int adb_chmod_stub(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
+    //adbfs_conf.nochown
     (void)fi;
     (void)path;
     (void)mode;
@@ -1130,6 +1131,7 @@ int adb_chmod_stub(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 int adb_chown_stub(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi)
 {
+    //adbfs_conf.nochmod
     (void)fi;
     (void)path;
     (void)uid;
@@ -1140,51 +1142,46 @@ int adb_chown_stub(const char *path, uid_t uid, gid_t gid, struct fuse_file_info
 
 /**
    Main struct for FUSE interface.
+   Set up the fuse_operations struct adbfs_oper using above adb_*
+   functions
  */
-static struct fuse_operations adbfs_oper;
+static struct fuse_operations adbfs_oper = {
+    .getattr    = adb_getattr,
+    .readlink   = adb_readlink,
+    .mknod      = adb_mknod,
+    .mkdir      = adb_mkdir,
+    .unlink     = adb_unlink,
+    .rmdir      = adb_rmdir,
+    .rename     = adb_rename,
+    .chmod      = adb_chmod_stub,
+    .chown      = adb_chown_stub,
+    .truncate   = adb_truncate,
+    .open       = adb_open,
+    .read       = adb_read,
+    .write      = adb_write,
+    .statfs     = adb_statfs,
+    .flush      = adb_flush,
+    .release    = adb_release,
+    .readdir    = adb_readdir,
+    .init       = adb_init,
+    .access     = adb_access,
+    .utimens    = adb_utimens,
+};
 
 /**
-   Set up the fuse_operations struct adbfs_oper using above adb_*
-   functions and then call fuse_main to manage things.
-
+ * call fuse_main to manage things.
    @see fuse_main in fuse.h.
  */
 int main(int argc, char *argv[])
 {
     signal(SIGSEGV, handler);   // install our handler
     makeTmpDir();
-    memset(&adbfs_oper, 0, sizeof(adbfs_oper));
-    adbfs_oper.init = adb_init;
-    adbfs_oper.readdir= adb_readdir;
-    adbfs_oper.getattr= adb_getattr;
-    adbfs_oper.access= adb_access;
-    adbfs_oper.open= adb_open;
-    adbfs_oper.flush = adb_flush;
-    adbfs_oper.release = adb_release;
-    adbfs_oper.read= adb_read;
-    adbfs_oper.write = adb_write;
-    adbfs_oper.utimens = adb_utimens;
-    adbfs_oper.truncate = adb_truncate;
-    adbfs_oper.mknod = adb_mknod;
-    adbfs_oper.mkdir = adb_mkdir;
-    adbfs_oper.rename = adb_rename;
-    adbfs_oper.rmdir = adb_rmdir;
-    adbfs_oper.unlink = adb_unlink;
-    adbfs_oper.readlink = adb_readlink;
-    adbfs_oper.statfs = adb_statfs;
-
-    adb_shell("ls");
 
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
     memset(&adbfs_conf, 0, sizeof(adbfs_conf));
     fuse_opt_parse(&args, &adbfs_conf, adb_opts, NULL);
 
-    if (!adbfs_conf.nochown) {
-        adbfs_oper.chmod = adb_chmod_stub;
-    }
-    if (!adbfs_conf.nochmod) {
-        adbfs_oper.chown = adb_chown_stub;
-    }
+    adb_shell("ls");
 
     return fuse_main(args.argc, args.argv, &adbfs_oper, NULL);
 }
