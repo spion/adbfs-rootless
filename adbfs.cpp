@@ -1107,14 +1107,48 @@ static int adb_readlink(const char *path, char *buf, size_t size)
     return 0;
 }
 
+
 static int adb_statfs(const char *path, struct statvfs *buf)
 {
-    // refer to sshfs_statfs
+    //cout << "statfs called: " << path << "\n";
+    vector<int> blocks_info;
+
+    // FIXME: cause crash
+    /*
+    string command = "df '";
+    command.append(path);
+    command.append("'");
+    auto output_queue = adb_shell(command);
+    if (!output_queue.empty())
+        output_queue.pop();
+    if (!output_queue.empty() && output_queue.front().size() > 0)
+    {
+        auto output_arr = make_array(output_queue.front());
+        for (int i=0; i<output_arr.size(); i++)
+        {
+            string s = output_arr[i];
+            string::const_iterator it = s.begin();
+            while (it != s.end() && std::isdigit(*it)) ++it;
+            if (!s.empty() && it == s.end())
+                blocks_info.push_back(atoi(s.c_str()));
+        }
+    }
+    */
+
 	buf->f_namemax = 255;
     buf->f_bsize = 4096;
     buf->f_frsize = buf->f_bsize;
-	buf->f_blocks = buf->f_bfree =  buf->f_bavail =
-		1000ULL * 1024 * 1024 * 1024 / buf->f_frsize;
+    if (blocks_info.size() == 3)
+    {
+        buf->f_blocks = blocks_info[0]/4;
+        buf->f_bfree = buf->f_bavail = blocks_info[2]/4;
+        //buf->f_bfree = buf->f_bavail = buf->f_blocks - blocks_info[1]/4;
+    }
+    else
+    {
+        buf->f_blocks = buf->f_bfree = buf->f_bavail =
+            1000ULL * 1024 * 1024 * 1024 / buf->f_frsize;
+    }
 	buf->f_files = buf->f_ffree = 1000000000;
 	return 0;
 }
