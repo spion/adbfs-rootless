@@ -1,0 +1,23 @@
+builddir = .
+
+CXX = g++
+CFLAGS = -O3
+
+pool local_pool
+ depth = 4
+
+build all: phony adbfs
+
+rule link
+ description = linking $out
+ command = /bin/sh -c "$CXX $in -o $out -Wall \$$(pkg-config fuse3 --libs)"
+build adbfs: link adbfs.o
+
+rule compile
+ description = compiling $out
+ depfile = $out.d
+ deps = gcc
+ command = /bin/sh -c "$CXX $CFLAGS -MD -MF $out.d -c $in -o $out -Wall \$$(pkg-config fuse3 --cflags)"
+build adbfs.o: compile adbfs.cpp | utils.h
+
+default all
