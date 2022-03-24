@@ -3,3 +3,5 @@ adbfs.o
 .cproject
 .project
 .settings
+.ninja_log
+.ninja_deps
