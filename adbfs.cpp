@@ -424,7 +424,7 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     vector<string> output_chunk;
     if (fileData.find(path_string) ==  fileData.end()
 	|| fileData[path_string].timestamp + 30 < time(NULL)) {
-        string command = "ls -l -a -d '";
+        string command = "ls -l -a -d --full-time '";
         command.append(path_string);
         command.append("'");
         output = adb_shell(command, true);
@@ -531,20 +531,25 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     //cout << endl;
 
     vector<string> ymd = make_array(output_chunk[iDate], "-");
-    vector<string> hm = make_array(output_chunk[iDate + 1], ":");
-
+    // "hh:mm:ss.nnnnnnnnn" from "ls --full-time" -> {"hh", "mm", "ss.nnnnnnnnn"}
+    vector<string> hms = make_array(output_chunk[iDate + 1], ":");
 
     //for (int k = 0; k < ymd.size(); ++k) cout << ymd[k] << " ";
     //cout << endl;
-    //for (int k = 0; k <  hm.size(); ++k) cout <<  hm[k] << " ";
+    //for (int k = 0; k < hms.size(); ++k) cout << hms[k] << " ";
     //cout << endl;
+
     struct tm ftime;
     ftime.tm_year = atoi(ymd[0].c_str()) - 1900;
     ftime.tm_mon  = atoi(ymd[1].c_str()) - 1;
     ftime.tm_mday = atoi(ymd[2].c_str());
-    ftime.tm_hour = atoi(hm[0].c_str());
-    ftime.tm_min  = atoi(hm[1].c_str());
-    ftime.tm_sec  = 0;
+    ftime.tm_hour = atoi(hms[0].c_str());
+    ftime.tm_min  = atoi(hms[1].c_str());
+
+    vector<string> sec_nano = make_array(hms[2], "."); 
+    ftime.tm_sec  = atoi(sec_nano[0].c_str());
+    int nano = atoi(sec_nano[1].c_str());
+
     ftime.tm_isdst = -1;
     time_t now = mktime(&ftime);
     //cout << "after mktime" << endl;
@@ -552,10 +557,13 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     //long now = time(0);
 
     stbuf->st_atime = now;   /* time of last access */
+    stbuf->st_atim.tv_nsec = nano;
     //stbuf->st_atime = atol(output_chunk[11].c_str());   /* time of last access */
     stbuf->st_mtime = now;   /* time of last modification */
+    stbuf->st_mtim.tv_nsec = nano;
     //stbuf->st_mtime = atol(output_chunk[12].c_str());   /* time of last modification */
     stbuf->st_ctime = now;   /* time of last status change */
+    stbuf->st_ctim.tv_nsec = nano;
     //stbuf->st_ctime = atol(output_chunk[13].c_str());   /* time of last status change */
     return res;
 }
@@ -591,7 +599,7 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     shell_escape_path(path_string);
 
     queue<string> output;
-    string command = "ls -l -a '";
+    string command = "ls -l -a --full-time '";
     command.append(path_string);
     command.append("'");
     output = adb_shell(command);
@@ -621,8 +629,11 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                     cout << "cached " << endl;
                 }
             } else {
-                // Start of filename = `ls -la` time separator + 4
-                size_t nameStart = output.front().find_first_of(":") + 4;
+                // Start of filename = `ls -la --full-time` time separator + 23
+	        // i.e.
+	        // -rw-rw-r-- root     sdcard_rw   763362 yyyy-mm-dd hh:mm:ss.nnnnnnnnn -0800 file.html
+	        //                                                     ^~~~~~~~~~~~~~~~~~~~~~~
+                size_t nameStart = output.front().find_first_of(":") + 23;
                 const string& fname_l = output.front().substr(nameStart);
                 const string fname_n = fname_l.substr(0, fname_l.find(" -> "));
                 cout << "Adding file:" << fname_n <<":" << endl;
@@ -663,7 +674,7 @@ static int adb_open(const char *path, struct fuse_file_info *fi)
     cout << "-- adb_open --" << path_string << " " << local_path_string << "\n";
     if (!fileTruncated[path_string]){
         queue<string> output;
-        string command = "ls -l -a -d '";
+        string command = "ls -l -a -d --full-time '";
         command.append(path_string);
         command.append("'");
         cout << command<<"\n";
@@ -810,7 +821,7 @@ static int adb_truncate(const char *path, off_t size) {
 
     queue<string> output;
     cout << "adb_truncate" << endl;
-    string command = "ls -l -a -d '";
+    string command = "ls -l -a -d --full-time '";
     command.append(path_string);
     command.append("'");
     cout << command << "\n";
@@ -970,7 +981,7 @@ static int adb_readlink(const char *path, char *buf, size_t size)
 
     if (fileData.find(path_string) ==  fileData.end()
 	|| fileData[path_string].timestamp + 30 < time(NULL)) {
-        string command = "ls -l -a -d '";
+        string command = "ls -l -a -d --full-time '";
         command.append(path_string);
         command.append("'");
         output = adb_shell(command);
