@@ -75,7 +75,7 @@
 #include "utils.h"
 #include <unistd.h>
 
-#include<stddef.h>
+#include <stddef.h>
 #include <execinfo.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -83,6 +83,8 @@
 #include <pwd.h>
 #include <grp.h>
 #include <time.h>
+
+#include <fuse_opt.h>
 
 void handler(int sig) {
   void *array[10];
@@ -468,6 +470,7 @@ static int adb_getattr(const char *path, struct stat *stbuf, struct fuse_file_in
     } else{
         output_chunk = make_array(fileData[path_string].statOutput);
         cout << "from cache " << path << "\n";
+        cout << fileData[path_string].statOutput << endl;
     }
     if (fileData[path_string].statOutput.empty()) {
         // return empty structure - file exists, but no info available
@@ -558,9 +561,9 @@ static int adb_getattr(const char *path, struct stat *stbuf, struct fuse_file_in
     vector<string> hm = make_array(output_chunk[iDate + 1], ":");
 
 
-	if (ymd.size() == 3 && hm.size() == 2)
+	if (ymd.size() == 3 && hm.size() >= 2)
 	{
-			
+
 	    //for (int k = 0; k < ymd.size(); ++k) cout << ymd[k] << " ";
 	    //cout << endl;
 	    //for (int k = 0; k <  hm.size(); ++k) cout <<  hm[k] << " ";
@@ -583,9 +586,9 @@ static int adb_getattr(const char *path, struct stat *stbuf, struct fuse_file_in
 	    ftime.tm_isdst = -1;
 	    time_t now = mktime(&ftime);
 	    //cout << "after mktime" << endl;
-	
+
 	    //long now = time(0);
-	
+
 	    stbuf->st_atime = now;   /* time of last access */
 	    //stbuf->st_atime = atol(output_chunk[11].c_str());   /* time of last access */
 	    stbuf->st_mtime = now;   /* time of last modification */
@@ -819,9 +822,9 @@ static int adb_release(const char *path, struct fuse_file_info *fi) {
     int fd = fi->fh;
     filePendingWrite.erase(filePendingWrite.find(fd));
     close(fd);
-    
+
     // remove local copy
-    unlink(local_path_string.c_str());    
+    unlink(local_path_string.c_str());
     return 0;
 }
 
@@ -1063,7 +1066,6 @@ static int adb_readlink(const char *path, char *buf, size_t size)
         if (output.empty())
             return -EINVAL;
         // error format: "/sbin/healthd: Permission denied"
-
         if ((output.front().length() > sizeof(PERMISSION_ERR_MSG)) &&
            (!output.front().compare(output.front().length() - sizeof(PERMISSION_ERR_MSG) + 1,
                                     sizeof(PERMISSION_ERR_MSG) - 1, PERMISSION_ERR_MSG)))
@@ -1084,7 +1086,7 @@ static int adb_readlink(const char *path, char *buf, size_t size)
     if (!is_valid_ls_output(res)) {
       return -ENOENT;
     }
-    cout << "adb_readlink " << res << endl;
+    cout << res << endl;
     size_t pos = res.find(" -> ");
     if(pos == string::npos)
        return -EINVAL;
