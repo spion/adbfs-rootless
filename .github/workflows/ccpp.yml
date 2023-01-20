@@ -6,10 +6,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v2
     - name: build-deps
-      run: sudo apt-get install libfuse-dev
+      run: sudo apt-get install libfuse3-dev
     - name: make
       run: make
