@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: build-deps
-      run: sudo apt-get install libfuse-dev
+      run: sudo apt-get -y install libfuse-dev
     - name: make
       run: make
 
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: prepare
-        run: apt-get update && apt-get install fuse libfuse-dev
+        run: apt-get update && apt-get install -y fuse libfuse-dev
       - name: get-adbfs-binary
         uses: actions/download-artifact@v3
         with:
