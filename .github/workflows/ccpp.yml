@@ -26,12 +26,12 @@ jobs:
 
     container:
       image: budtmo/docker-android-x86-10.0
-      options: --priviledged
+      options: --privileged
     steps:
       - uses: actions/checkout@v2
       - name: prepare
         run: apt-get install fuse libfuse-dev
-      - name: Download a single artifact
+      - name: get-adbfs-binary
         uses: actions/download-artifact@v3
         with:
           name: adbfs-bin
