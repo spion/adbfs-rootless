@@ -20,7 +20,7 @@ RUN chmod +x /src/docker/run-docker-test.sh
 COPY --from=buildenv /src/adbfs /usr/bin/adbfs
 RUN chmod +x /usr/bin/adbfs
 
-WORKDIR /root
+WORKDIR /src
 CMD /src/docker/run-docker-test.sh
 
 

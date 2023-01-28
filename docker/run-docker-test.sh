@@ -1,10 +1,13 @@
 #!/bin/bash
 
+pushd /root || exit
+
 echo Running supervisord in the background
 # cd /root || exit
 /usr/bin/supervisord --configuration supervisord.conf &
 
-cd /src || exit
+popd || exit
+
 
 
 

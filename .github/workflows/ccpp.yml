@@ -5,11 +5,32 @@ on: [push]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
-    
+    runs-on: ubuntu-18.04
+
     steps:
     - uses: actions/checkout@v2
     - name: build-deps
       run: sudo apt-get install libfuse-dev
     - name: make
       run: make
+
+    - name: copy-binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: adbfs-bin
+        retention_days: 5
+        path: |
+          ./adbfs
+  test:
+    runs-on: ubuntu-18.04
+    container: budtmo/docker-android-x86-10.0
+    steps:
+      - uses: actions/checkout@v2
+      - name: prepare
+        run: sudo apt-get install fuse libfuse-dev
+      - name: Download a single artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: adbfs-bin
+      - name: run-tests
+        run: ./docker/run-docker-test.sh
