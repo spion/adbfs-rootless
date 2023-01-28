@@ -15,7 +15,10 @@ then
   popd || exit
 fi
 
+sleep 1
+
 ps aux | grep supervisord
+
 
 WAIT_TIME=60
 
@@ -57,6 +60,7 @@ wait_available() {
 
 echo Checking readiness via adb shell ls -d /sdcard/Android
 wait_available /sdcard/Android
+
 
 mkdir -p /adbfs
 /usr/bin/adbfs /adbfs
