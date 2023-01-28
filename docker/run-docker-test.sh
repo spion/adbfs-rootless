@@ -9,7 +9,7 @@ echo Running supervisord in the background
 popd || exit
 
 
-WAIT_TIME=120
+WAIT_TIME=160
 
 wait_available() {
 
@@ -20,7 +20,7 @@ wait_available() {
   do
     RETRIES=$((RETRIES - 1))
 
-    OUTPUT=$(adb shell ls -d "$WAIT_DIR" 2> /dev/null)
+    OUTPUT=$(adb shell ls -d "$WAIT_DIR")
 
     if [ "$OUTPUT" == "$WAIT_DIR" ]
     then
