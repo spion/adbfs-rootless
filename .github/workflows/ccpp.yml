@@ -22,8 +22,8 @@ jobs:
         path: |
           ./adbfs
   test:
+    needs: build
     runs-on: ubuntu-18.04
-
     container:
       image: budtmo/docker-android-x86-10.0
       options: --privileged
