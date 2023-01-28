@@ -2,31 +2,17 @@
 
 
 
-if [ -z "$GITHUB_ACTIONS_NOTNEEDED" ];
-then
-  echo "Running outside of github actions so we need to run the emulator start script"
 
-  pushd /root || exit
+pushd /root || exit
 
-  echo Running supervisord in the background
-  # cd /root || exit
-  /usr/bin/supervisord --configuration supervisord.conf &
+echo Running supervisord in the background
+# cd /root || exit
+HOME=/root /usr/bin/supervisord --configuration supervisord.conf &
 
-  popd || exit
-fi
+popd || exit
 
 WAIT_TIME=60
 
-sleep 3;
-tail -f /var/log/supervisor/docker-android.stderr.log &
-
-
-echo HOME = "$HOME"
-echo ANDROID_AVD_HOME = "$ANDROID_AVD_HOME"
-echo ANDROID_SDK_HOME = "$ANDROID_SDK_HOME"
-
-echo "ls $HOME/.android/avd"
-ls $HOME/.android/avd
 
 wait_available() {
 
