@@ -9,11 +9,11 @@ echo Running supervisord in the background
 popd || exit
 
 
-
+WAIT_TIME=120
 
 wait_available() {
 
-  RETRIES=60
+  RETRIES=$WAIT_TIME
   WAIT_DIR="$1"
 
   while [ $RETRIES -gt 0 ];
@@ -32,7 +32,7 @@ wait_available() {
 
   if [ $RETRIES -le 0 ]
   then
-    echo "Emulator directory $1 was not available, exiting"
+    echo "Emulator directory $1 was not available for $WAIT_TIME seconds, exiting"
     exit 1
   fi
 
