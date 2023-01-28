@@ -1,7 +1,8 @@
 #!/bin/bash
 
 
-if [ -z "$GITHUB_ACTIONS" ];
+
+if [ -z "$GITHUB_ACTIONS_NOTNEEDED" ];
 then
   echo "Running outside of github actions so we need to run the emulator start script"
 
@@ -13,6 +14,8 @@ then
 
   popd || exit
 fi
+
+ps aux | grep supervisord
 
 WAIT_TIME=60
 
