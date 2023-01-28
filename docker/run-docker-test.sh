@@ -20,7 +20,7 @@ wait_available() {
   do
     RETRIES=$((RETRIES - 1))
 
-    OUTPUT=$(adb shell ls -d "$WAIT_DIR")
+    OUTPUT=$(adb shell ls -d "$WAIT_DIR" 2> /dev/null)
 
     if [ "$OUTPUT" == "$WAIT_DIR" ]
     then
@@ -34,6 +34,14 @@ wait_available() {
   then
     echo "Emulator directory $1 was not available for $WAIT_TIME seconds, exiting"
     echo "Last output was: $OUTPUT"
+    echo ""
+    echo "Logs for docker-appium were (stdout)"
+    echo ""
+    cat /var/log/supervisor/docker-android.stdout.log
+    echo ""
+    echo "stderr"
+    echo ""
+    cat /var/log/supervisor/docker-android.stderr.log
     exit 1
   fi
 
