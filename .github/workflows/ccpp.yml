@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: prepare
-        run: apt-get install fuse libfuse-dev
+        run: apt-get update && apt-get install fuse libfuse-dev
       - name: get-adbfs-binary
         uses: actions/download-artifact@v3
         with:
