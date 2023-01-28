@@ -33,6 +33,7 @@ wait_available() {
   if [ $RETRIES -le 0 ]
   then
     echo "Emulator directory $1 was not available for $WAIT_TIME seconds, exiting"
+    echo "Last output was: $OUTPUT"
     exit 1
   fi
 
