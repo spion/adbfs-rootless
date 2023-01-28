@@ -1,15 +1,20 @@
 #!/bin/bash
 
-pushd /root || exit
 
-echo Running supervisord in the background
-# cd /root || exit
-/usr/bin/supervisord --configuration supervisord.conf &
+if [ -z "$GITHUB_ACTIONS" ];
+then
+  echo "Running outside of github actions so we need to run the emulator start script"
 
-popd || exit
+  pushd /root || exit
 
+  echo Running supervisord in the background
+  # cd /root || exit
+  /usr/bin/supervisord --configuration supervisord.conf &
 
-WAIT_TIME=160
+  popd || exit
+fi
+
+WAIT_TIME=60
 
 wait_available() {
 
