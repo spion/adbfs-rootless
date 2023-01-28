@@ -15,12 +15,18 @@ then
   popd || exit
 fi
 
-sleep 1
-
-ps aux | grep supervisord
-
-
 WAIT_TIME=60
+
+sleep 3;
+tail -f /var/log/supervisor/docker-android.stderr.log &
+
+
+echo HOME = "$HOME"
+echo ANDROID_AVD_HOME = "$ANDROID_AVD_HOME"
+echo ANDROID_SDK_HOME = "$ANDROID_SDK_HOME"
+
+echo "ls $HOME/.android/avd"
+ls $HOME/.android/avd
 
 wait_available() {
 
