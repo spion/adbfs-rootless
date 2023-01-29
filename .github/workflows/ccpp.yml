@@ -21,7 +21,7 @@ jobs:
           ./adbfs
   test:
     needs: build
-    runs-on: ubuntu-18.04
+    runs-on: macos-latest
     container:
       image: budtmo/docker-android-x86-10.0
       options: --privileged
