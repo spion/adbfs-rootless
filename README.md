@@ -10,7 +10,7 @@ You will need `libfuse-dev` and `adb`. You will also need `build-essential`, `gi
 
 Clone the repository:
 
-    git clone git://github.com/spion/adbfs-rootless.git
+    git clone git@github.com:spion/adbfs-rootless.git
     cd adbfs-rootless    
 
 Build:
