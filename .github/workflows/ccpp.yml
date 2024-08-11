@@ -23,8 +23,8 @@ jobs:
     needs: build
     runs-on: ubuntu-lastest
     container:
-      image: budtmo/docker-android-x86-10.0
-      # options: --privileged
+      image: budtmo/docker-android:emulator_12.0
+      options: --privileged
     steps:
       - uses: actions/checkout@v2
       - name: prepare
