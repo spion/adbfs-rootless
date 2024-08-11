@@ -21,7 +21,7 @@ jobs:
           ./adbfs
   test:
     needs: build
-    runs-on: ubuntu-lastest
+    runs-on: ubuntu-latest
     container:
       image: budtmo/docker-android:emulator_12.0
       options: --privileged
