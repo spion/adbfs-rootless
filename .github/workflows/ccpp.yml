@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-lastest
     container:
       image: budtmo/docker-android-x86-10.0
-      options: --privileged
+      # options: --privileged
     steps:
       - uses: actions/checkout@v2
       - name: prepare
