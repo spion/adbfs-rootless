@@ -35,4 +35,4 @@ jobs:
         with:
           name: adbfs-bin
       - name: run-tests
-        run: ./docker/run-docker-test.sh
+        run: sudo bash ./docker/run-docker-test.sh
