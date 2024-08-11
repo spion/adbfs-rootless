@@ -16,12 +16,12 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: adbfs-bin
-        retention_days: 5
+        retention-days: 5
         path: |
           ./adbfs
   test:
     needs: build
-    runs-on: macos-latest
+    runs-on: ubuntu-18.04
     container:
       image: budtmo/docker-android-x86-10.0
       options: --privileged
