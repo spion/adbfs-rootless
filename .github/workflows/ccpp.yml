@@ -22,17 +22,27 @@ jobs:
   test:
     needs: build
     runs-on: ubuntu-latest
-    services:
-      emulator:
-        image: budtmo/docker-android:emulator_12.0
-        options: --privileged
     steps:
-      - uses: actions/checkout@v4
-      - name: prepare
-        run: sudo apt-get update && sudo apt-get install -y fuse libfuse-dev
-      - name: get-adbfs-binary
-        uses: actions/download-artifact@v4
-        with:
-          name: adbfs-bin
-      - name: run-tests
-        run: sudo bash ./docker/run-docker-test.sh
+    - uses: actions/checkout@v4
+    - name: prepare
+      run: sudo apt-get update && sudo apt-get install -y fuse libfuse-dev
+    - name: get-adbfs-binary
+      uses: actions/download-artifact@v4
+      with:
+        name: adbfs-bin
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kv
+    - name: run tests
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 29
+        script: ./gradlew connectedCheck
+    # services:
+      # emulator:
+        # image: budtmo/docker-android:emulator_12.0
+        # options: --privileged
+      # - name: run-tests
+      #   run: sudo bash ./docker/run-docker-test.sh

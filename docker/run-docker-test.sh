@@ -1,15 +1,11 @@
 #!/bin/bash
 
-
-
-
-pushd /root || exit
-
-echo Running supervisord in the background
+# echo Running supervisord in the background
 # cd /root || exit
-HOME=/root /usr/bin/supervisord --configuration supervisord.conf &
 
-popd || exit
+# SUPERVISORD_CONFIG_PATH="${APP_PATH}/mixins/configs/process"
+# /usr/bin/supervisord --configuration ${SUPERVISORD_CONFIG_PATH}/supervisord-port.conf & \
+# /usr/bin/supervisord --configuration ${SUPERVISORD_CONFIG_PATH}/supervisord-base.conf & \
 
 WAIT_TIME=60
 
@@ -38,13 +34,13 @@ wait_available() {
     echo "Emulator directory $1 was not available for $WAIT_TIME seconds, exiting"
     echo "Last output was: $OUTPUT"
     echo ""
-    echo "Logs for docker-appium were (stdout)"
-    echo ""
-    cat /var/log/supervisor/docker-android.stdout.log
-    echo ""
-    echo "stderr"
-    echo ""
-    cat /var/log/supervisor/docker-android.stderr.log
+    # echo "Logs for docker-appium were (stdout)"
+    # echo ""
+    # cat /var/log/supervisor/docker-android.stdout.log
+    # echo ""
+    # echo "stderr"
+    # echo ""
+    # cat /var/log/supervisor/docker-android.stderr.log
     exit 1
   fi
 
