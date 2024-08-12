@@ -39,7 +39,7 @@ jobs:
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level: 29
-        script: ./gradlew connectedCheck
+        script: ./docker/run-docker-test.sh
     # services:
       # emulator:
         # image: budtmo/docker-android:emulator_12.0
