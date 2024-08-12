@@ -9,6 +9,7 @@
 
 WAIT_TIME=60
 
+export PATH=/usr/local/lib/android/sdk/platform-tools:$PATH
 
 wait_available() {
 
