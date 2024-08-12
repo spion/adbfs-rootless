@@ -47,7 +47,8 @@ wait_available() {
 }
 
 echo Checking readiness via adb shell ls -d /sdcard/Android
-wait_available /sdcard
+adb devices
+wait_available /
 
 
 mkdir -p /adbfs
