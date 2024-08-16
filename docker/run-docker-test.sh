@@ -49,9 +49,11 @@ wait_available() {
 
 # No need to check for readiness when running on GHA
 # reactivecircus/android-emulator-runner already handles that
-#echo Checking readiness via adb shell ls -d /sdcard/Android
-#adb devices
-#wait_available /
+# Disabling wait_available because it errors out sometims
+#
+# echo Checking readiness via adb shell ls -d /sdcard/Android
+# adb devices
+# wait_available /
 
 
 mkdir -p /adbfs
@@ -60,6 +62,8 @@ mkdir -p /adbfs
 echo Ready to run adbfs tests
 
 BASE_DIR=/adbfs/sdcard/test
+
+adb shell ls -lh /sdcard
 
 test_mkdir() {
 
