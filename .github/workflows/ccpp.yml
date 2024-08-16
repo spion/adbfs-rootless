@@ -20,16 +20,15 @@ jobs:
         path: |
           ./adbfs
   test:
-    needs: build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: prepare
       run: sudo apt-get update && sudo apt-get install -y fuse libfuse-dev
-    - name: get-adbfs-binary
-      uses: actions/download-artifact@v4
-      with:
-        name: adbfs-bin
+
+    - name: make
+      run: make
+
     - name: copy adbfs binary
       run: |
         sudo cp ${{ github.workspace }}/adbfs /usr/bin/adbfs
