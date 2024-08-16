@@ -59,6 +59,8 @@ echo Ready to run adbfs tests
 
 BASE_DIR=/adbfs/sdcard/test
 
+adb shell ls -l /sdcard/
+
 test_mkdir() {
 
   local_timestamp=$(date "+%s")
@@ -75,6 +77,8 @@ test_mkdir() {
   if [ "$abs_diff" -gt 120 ];
   then
     echo "FAIL test_mkdir: file timestamp difference exceeds 120s: $abs_diff"
+    echo "timestamp: $timestamp"
+    echo "local timestamp: $local_timestamp"
     exit 1
   fi
 
@@ -107,6 +111,8 @@ test_catfile() {
   if [ "$abs_diff" -gt 120 ];
   then
     echo "FAIL test_catfile: file timestamp difference exceeds 120s: $abs_diff"
+    echo "timestamp: $timestamp"
+    echo "local timestamp: $local_timestamp"
     exit 1
   fi
 
