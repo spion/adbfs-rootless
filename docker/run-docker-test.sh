@@ -49,11 +49,10 @@ wait_available() {
 
 # No need to check for readiness when running on GHA
 # reactivecircus/android-emulator-runner already handles that
-# Disabling wait_available because it errors out sometims
-#
-# echo Checking readiness via adb shell ls -d /sdcard/Android
-# adb devices
-# wait_available /
+# Disable wait_available because it errors out sometimes
+echo Checking readiness via adb shell ls -d /sdcard/Android
+adb devices
+wait_available /
 
 
 mkdir -p /adbfs
@@ -83,6 +82,7 @@ test_mkdir() {
     echo "FAIL test_mkdir: file timestamp difference exceeds 120s: $abs_diff"
     echo "timestamp: $timestamp"
     echo "local timestamp: $local_timestamp"
+    exit 1
   fi
 
   if [ "$path" != "$BASE_DIR/x" ];
@@ -116,6 +116,7 @@ test_catfile() {
     echo "FAIL test_catfile: file timestamp difference exceeds 120s: $abs_diff"
     echo "timestamp: $timestamp"
     echo "local timestamp: $local_timestamp"
+    exit 1
   fi
 
   if [ "$path" != "$BASE_DIR/file.txt" ];
