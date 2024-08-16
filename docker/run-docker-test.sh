@@ -63,7 +63,7 @@ echo Ready to run adbfs tests
 
 BASE_DIR=/adbfs/sdcard/test
 
-adb shell ls -l /sdcard
+adb shell ls -l /sdcard/
 
 test_mkdir() {
 
