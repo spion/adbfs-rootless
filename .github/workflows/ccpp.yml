@@ -21,6 +21,41 @@ jobs:
           ./adbfs
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        emulator:
+          - { 'api_level': 35, 'api_type_target': 'google_apis', 'arch': 'x86_64' }
+          - { 'api_level': 34, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 33, 'api_type_target': 'aosp_atd', 'arch': 'x86_64' }
+          - { 'api_level': 32, 'api_type_target': 'aosp_atd', 'arch': 'x86_64' }
+          - { 'api_level': 31, 'api_type_target': 'aosp_atd', 'arch': 'x86_64' }
+          - { 'api_level': 30, 'api_type_target': 'aosp_atd', 'arch': 'x86_64' }
+          - { 'api_level': 30, 'api_type_target': 'aosp_atd', 'arch': 'x86' }
+          - { 'api_level': 29, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 29, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 28, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 28, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 27, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 27, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 26, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 26, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 25, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 25, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 24, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 24, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 23, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 23, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 22, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 22, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 21, 'api_type_target': 'default', 'arch': 'x86_64' }
+          - { 'api_level': 21, 'api_type_target': 'default', 'arch': 'x86' }
+
+          - { 'api_level': 19, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 18, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 17, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 16, 'api_type_target': 'default', 'arch': 'x86' }
+          - { 'api_level': 15, 'api_type_target': 'default', 'arch': 'x86' }
     steps:
     - uses: actions/checkout@v4
     - name: prepare
@@ -41,7 +76,9 @@ jobs:
     - name: run tests
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 29
+        api-level: ${{ matrix.emulator.api_level }}
+        arch: ${{ matrix.emulator.arch }}
+        target: ${{ matrix.emulator.api_type_target }}
         script: sudo ./docker/run-docker-test.sh
     # services:
       # emulator:
