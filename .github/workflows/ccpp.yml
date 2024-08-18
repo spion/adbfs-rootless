@@ -23,6 +23,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         api-level: [21, 29, 31, 33, 34, 35]
 
