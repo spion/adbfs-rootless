@@ -44,7 +44,7 @@ jobs:
       with:
         api-level: 29
         script: |
-          export PATH=/usr/local/lib/android/sdk/platform-tools:$PATH && sudo ./tests/run.sh
+          sudo bash -c 'env PATH=/usr/local/lib/android/sdk/platform-tools:$PATH ./tests/run.sh'
     # services:
       # emulator:
         # image: budtmo/docker-android:emulator_12.0
