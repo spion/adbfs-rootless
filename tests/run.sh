@@ -52,7 +52,7 @@ wait_available /
 
 
 mkdir -p /adbfs
-/usr/bin/adbfs /adbfs
+adbfs /adbfs
 
 echo Ready to run adbfs tests
 
