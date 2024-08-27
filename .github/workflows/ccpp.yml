@@ -4,12 +4,72 @@ on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: build-deps
-      run: sudo apt-get install libfuse-dev
+      run: sudo apt-get -y install libfuse-dev
     - name: make
       run: make
+
+    - name: copy-binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: adbfs-bin
+        retention-days: 5
+        path: |
+          ./adbfs
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: prepare
+      run: sudo apt-get update && sudo apt-get install -y fuse libfuse-dev
+    - name: get-adbfs-binary
+      uses: actions/download-artifact@v4
+      with:
+        name: adbfs-bin
+    - name: copy adbfs binary
+      run: |
+        sudo cp ${{ github.workspace }}/adbfs /usr/bin/adbfs
+        sudo chmod +x /usr/bin/adbfs
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    - name: AVD cache
+      uses: actions/cache@v4
+      id: avd-cache
+      with:
+        path: |
+          ~/.android/avd/*
+          ~/.android/adb*
+        key: avd-${{ matrix.api-level }}
+
+    - name: create AVD and generate snapshot for caching
+      if: steps.avd-cache.outputs.cache-hit != 'true'
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ matrix.api-level }}
+        force-avd-creation: false
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: false
+        script: echo "Generated AVD snapshot for caching."
+
+
+    - name: run tests
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ matrix.api-level }}
+        force-avd-creation: false
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: true
+        script: sudo env PATH=/usr/local/lib/android/sdk/platform-tools:$PATH ./tests/run.sh
