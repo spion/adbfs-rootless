@@ -3,8 +3,10 @@ This variant of adbfs works even WITHOUT having root access (busybox) on your ph
 Instructions:
 =============
 
-You will need `libfuse-dev` and `adb`. You will also need `build-essential`, `git`, and `pkg-config`. On Ubuntu:
-    
+## Ubuntu
+
+You will need `libfuse-dev` and `adb`. You will also need `build-essential`, `git`, and `pkg-config`.
+
     sudo apt-get install libfuse-dev android-tools-adb
     sudo apt-get install build-essential git pkg-config
 
@@ -32,6 +34,36 @@ You can now mount your device (also from the platform-tools dir):
 If you want to trigger a media rescan after every operation, use the option `-o rescan`:
 
     ./adbfs -o rescan ~/droid
+
+Have fun!
+
+## MacOS
+
+Install adb and fuse
+
+    brew install --cask android-platform-tools
+    brew install --cask macfuse
+
+Check access to phone through adb
+
+    adb devices
+
+Clone the repository:
+
+    git clone https://github.com/spion/adbfs-rootless.git
+    cd adbfs-rootless
+
+Build:
+
+    make
+
+Create a mount point if needed (e.g. in your home directory):
+
+    mkdir ~/droid
+
+Mount your device (You will be asked and have to allow fuse extension):
+
+    ./adbfs ~/droid
 
 Have fun!
 
