@@ -83,6 +83,15 @@
 #include <pwd.h>
 #include <grp.h>
 
+// st_*tim is st_*timespec on Mac
+// TODO: also handle freebsd and netbsd ?
+// ref. https://github.com/golang/go/issues/31735#issuecomment-487759480
+#if defined(__APPLE__) && defined(__MACH__)
+#define st_atim st_atimespec
+#define st_mtim st_mtimespec
+#define st_ctim st_ctimespec
+#endif /* (!_POSIX_C_SOURCE || _DARWIN_C_SOURCE) */
+
 void handler(int sig) {
   void *array[10];
   size_t size;
@@ -429,7 +438,10 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     vector<string> output_chunk;
     if (fileData.find(path_string) ==  fileData.end()
 	|| fileData[path_string].timestamp + 30 < time(NULL)) {
-        string command = "ls -l -a -d '";
+        // output format similar to `ls -l -a -d`, but with timestamps showing nanosecond precision and timezone information
+        // drwxrwx--- 4 media_rw media_rw 3452 2024-05-30 19:03:11.545604316 +0800 /storage/emulated
+        // TODO error handling of `stat`
+        string command = "stat -c '%A %h %U %G %s %y %N' '";
         command.append(path_string);
         command.append("'");
         output = adb_shell(command, true);
@@ -536,7 +548,8 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     //cout << endl;
 
     vector<string> ymd = make_array(output_chunk[iDate], "-");
-    vector<string> hm = make_array(output_chunk[iDate + 1], ":");
+    vector<string> hms = make_array(output_chunk[iDate + 1], ":");
+    vector<string> sns = make_array(hms[2], ".");
 
 
     //for (int k = 0; k < ymd.size(); ++k) cout << ymd[k] << " ";
@@ -547,20 +560,24 @@ static int adb_getattr(const char *path, struct stat *stbuf)
     ftime.tm_year = atoi(ymd[0].c_str()) - 1900;
     ftime.tm_mon  = atoi(ymd[1].c_str()) - 1;
     ftime.tm_mday = atoi(ymd[2].c_str());
-    ftime.tm_hour = atoi(hm[0].c_str());
-    ftime.tm_min  = atoi(hm[1].c_str());
-    ftime.tm_sec  = 0;
+    ftime.tm_hour = atoi(hms[0].c_str());
+    ftime.tm_min  = atoi(hms[1].c_str());
+    ftime.tm_sec  = atoi(sns[0].c_str());
     ftime.tm_isdst = -1;
     time_t now = mktime(&ftime);
-    //cout << "after mktime" << endl;
+    long now_ns = atoi(sns[1].c_str());
+    //cout << "after mktime " << now << ", with ns " << now_ns << endl;
 
     //long now = time(0);
 
     stbuf->st_atime = now;   /* time of last access */
+    stbuf->st_atim.tv_nsec = now_ns;
     //stbuf->st_atime = atol(output_chunk[11].c_str());   /* time of last access */
     stbuf->st_mtime = now;   /* time of last modification */
+    stbuf->st_mtim.tv_nsec = now_ns;
     //stbuf->st_mtime = atol(output_chunk[12].c_str());   /* time of last modification */
     stbuf->st_ctime = now;   /* time of last status change */
+    stbuf->st_ctim.tv_nsec = now_ns;
     //stbuf->st_ctime = atol(output_chunk[13].c_str());   /* time of last status change */
     return res;
 }
@@ -596,9 +613,13 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     shell_escape_path(path_string);
 
     queue<string> output;
-    string command = "ls -l -a '";
+    // execute `stat`  in directory so we can get only filename instead of full path in output
+    string command = "cd '";
     command.append(path_string);
-    command.append("'");
+    // output format similar to `ls -l -a`, but with timestamps showing nanosecond precision and timezone information
+    // drwxrwx--- 4 media_rw media_rw 3452 2024-05-30 19:03:11.545604316 +0800 /storage/emulated
+    // TODO error handling
+    command.append("' && ls -a | xargs stat -c '%A %h %U %G %s %y %N'");
     output = adb_shell(command);
 
     /* cannot tell between "no phone" and "empty directory" */
@@ -627,7 +648,9 @@ static int adb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                 }
             } else {
                 // Start of filename = `ls -la` time separator + 4
-                size_t nameStart = output.front().find_first_of(":") + 4;
+                // + extra 19 for seconds + nanoseconds + timezone in output of `stat`
+                // drwxrwx--- 4 media_rw media_rw 3452 2024-05-30 19:03:11.545604316 +0800 /storage/emulated
+                size_t nameStart = output.front().find_first_of(":") + 23;
                 const string& fname_l = output.front().substr(nameStart);
                 const string fname_n = fname_l.substr(0, fname_l.find(" -> "));
                 cout << "Adding file:" << fname_n <<":" << endl;
