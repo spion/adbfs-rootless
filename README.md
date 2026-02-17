@@ -3,7 +3,43 @@ This variant of adbfs works even WITHOUT having root access (busybox) on your ph
 Instructions:
 =============
 
-## Ubuntu
+## Ubuntu (Rust)
+
+You will need the Rust toolchain, `libfuse3-dev`, and `adb`.
+
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    sudo apt-get install libfuse3-dev android-tools-adb
+
+Clone the repository:
+
+    git clone git@github.com:spion/adbfs-rootless.git
+    cd adbfs-rootless
+
+Build:
+
+    cargo build --release
+
+The binary will be at `target/release/adbfs`.
+
+Create a mount point if needed (e.g. in your home directory):
+
+    mkdir ~/droid
+
+You can now mount your device:
+
+    ./target/release/adbfs ~/droid
+
+If you want to trigger a media rescan after every operation:
+
+    ./target/release/adbfs --rescan ~/droid
+
+To set cache TTL (default 30 seconds):
+
+    ./target/release/adbfs --cache-ttl 60 ~/droid
+
+Have fun!
+
+## Ubuntu (C++ legacy)
 
 You will need `libfuse-dev` and `adb`. You will also need `build-essential`, `git`, and `pkg-config`.
 
@@ -13,7 +49,7 @@ You will need `libfuse-dev` and `adb`. You will also need `build-essential`, `gi
 Clone the repository:
 
     git clone git@github.com:spion/adbfs-rootless.git
-    cd adbfs-rootless    
+    cd adbfs-rootless
 
 Build:
 

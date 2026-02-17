@@ -1,0 +1,93 @@
+name: Rust CI
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+    - name: Install FUSE dev headers
+      run: sudo apt-get update && sudo apt-get install -y libfuse3-dev
+    - name: Check formatting
+      run: cargo fmt --check
+    - name: Clippy
+      run: cargo clippy -- -D warnings
+    - name: Build
+      run: cargo build
+    - name: Test
+      run: cargo test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Install FUSE dev headers
+      run: sudo apt-get update && sudo apt-get install -y libfuse3-dev
+    - name: Build release
+      run: cargo build --release
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: adbfs-rust-bin
+        retention-days: 5
+        path: target/release/adbfs
+
+  integration-test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install FUSE
+      run: sudo apt-get update && sudo apt-get install -y fuse3 libfuse3-dev
+    - name: Download binary
+      uses: actions/download-artifact@v4
+      with:
+        name: adbfs-rust-bin
+    - name: Install binary
+      run: |
+        sudo cp ${{ github.workspace }}/adbfs /usr/bin/adbfs
+        sudo chmod +x /usr/bin/adbfs
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+
+    - name: AVD cache
+      uses: actions/cache@v4
+      id: avd-cache
+      with:
+        path: |
+          ~/.android/avd/*
+          ~/.android/adb*
+        key: avd-${{ matrix.api-level }}
+
+    - name: Create AVD and generate snapshot for caching
+      if: steps.avd-cache.outputs.cache-hit != 'true'
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ matrix.api-level }}
+        force-avd-creation: false
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: false
+        script: echo "Generated AVD snapshot for caching."
+
+    - name: Run integration tests
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ matrix.api-level }}
+        force-avd-creation: false
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: true
+        script: sudo env PATH=/usr/local/lib/android/sdk/platform-tools:$PATH ./tests/run.sh
