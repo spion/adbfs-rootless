@@ -772,8 +772,7 @@ pub fn mount(
 
   let mut config = Config::default();
   config.mount_options = mount_options;
-  config.acl = SessionACL::All;
-
+  config.acl = SessionACL::RootAndOwner;
   fuser::mount2(adbfs, mountpoint, &config)?;
   Ok(())
 }
