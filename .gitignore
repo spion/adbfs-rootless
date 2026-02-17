@@ -3,3 +3,8 @@ adbfs.o
 .cproject
 .project
 .settings
+
+
+# Added by cargo
+
+/target
