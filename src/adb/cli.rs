@@ -2,27 +2,15 @@ use super::{AdbDevice, AdbError, ShellOutput};
 use async_trait::async_trait;
 use std::path::Path;
 use tokio::process::Command;
-use tokio::sync::Semaphore;
 use tracing::debug;
 
 pub struct AdbCli {
   serial: Option<String>,
-  semaphore: Semaphore,
-}
-
-fn max_concurrent_commands() -> usize {
-  std::thread::available_parallelism()
-    .map(|n| n.get())
-    .unwrap_or(4)
-    .min(16)
 }
 
 impl AdbCli {
   pub fn new(serial: Option<String>) -> Self {
-    Self {
-      serial,
-      semaphore: Semaphore::new(max_concurrent_commands()),
-    }
+    Self { serial }
   }
 
   fn base_command(&self) -> Command {
@@ -32,11 +20,6 @@ impl AdbCli {
     }
     cmd
   }
-
-  async fn run(&self, cmd: &mut Command) -> Result<std::process::Output, AdbError> {
-    let _permit = self.semaphore.acquire().await.expect("semaphore closed");
-    Ok(cmd.output().await?)
-  }
 }
 
 #[async_trait]
@@ -44,7 +27,10 @@ impl AdbDevice for AdbCli {
   async fn shell(&self, command: &str) -> Result<Vec<String>, AdbError> {
     debug!(cmd = command, "adb shell");
     let output = self
-      .run(self.base_command().arg("shell").arg(command))
+      .base_command()
+      .arg("shell")
+      .arg(command)
+      .output()
       .await?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -62,7 +48,10 @@ impl AdbDevice for AdbCli {
   async fn shell_with_stderr(&self, command: &str) -> Result<ShellOutput, AdbError> {
     debug!(cmd = command, "adb shell (with stderr)");
     let output = self
-      .run(self.base_command().arg("shell").arg(command))
+      .base_command()
+      .arg("shell")
+      .arg(command)
+      .output()
       .await?;
 
     let stdout: Vec<String> = String::from_utf8_lossy(&output.stdout)
@@ -84,7 +73,11 @@ impl AdbDevice for AdbCli {
   async fn pull(&self, remote: &Path, local: &Path) -> Result<(), AdbError> {
     debug!(?remote, ?local, "adb pull");
     let output = self
-      .run(self.base_command().arg("pull").arg(remote).arg(local))
+      .base_command()
+      .arg("pull")
+      .arg(remote)
+      .arg(local)
+      .output()
       .await?;
 
     if !output.status.success() {
@@ -100,7 +93,11 @@ impl AdbDevice for AdbCli {
   async fn push(&self, local: &Path, remote: &Path) -> Result<(), AdbError> {
     debug!(?local, ?remote, "adb push");
     let output = self
-      .run(self.base_command().arg("push").arg(local).arg(remote))
+      .base_command()
+      .arg("push")
+      .arg(local)
+      .arg(remote)
+      .output()
       .await?;
 
     if !output.status.success() {

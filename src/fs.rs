@@ -40,10 +40,15 @@ struct OpenFile {
   dirty: bool,
 }
 
+struct OpenDir {
+  entries: Vec<(u64, FileType, String)>,
+}
+
 pub struct AdbFs {
   ops: Arc<DeviceOps>,
   cache: MetadataCache,
   open_files: DashMap<u64, OpenFile>,
+  open_dirs: DashMap<u64, OpenDir>,
   tmp_dir: tempfile::TempDir,
   next_fh: AtomicU64,
   rt: tokio::runtime::Handle,
@@ -63,6 +68,7 @@ impl AdbFs {
       ops,
       cache: MetadataCache::new(cache_ttl),
       open_files: DashMap::new(),
+      open_dirs: DashMap::new(),
       tmp_dir: tempfile::TempDir::new()?,
       next_fh: AtomicU64::new(1),
       rt,
@@ -125,6 +131,7 @@ impl AdbFs {
 
   fn fetch_meta(&self, path: &str) -> Result<FileMeta, DeviceError> {
     if let Some(meta) = self.cache.get(path) {
+      trace!(path = %path, "cache hit");
       return Ok(meta);
     }
     let meta = self.rt.block_on(self.ops.get_metadata(path))?;
@@ -189,14 +196,7 @@ impl Filesystem for AdbFs {
     }
   }
 
-  fn readdir(
-    &self,
-    _req: &Request,
-    ino: INodeNo,
-    _fh: FileHandle,
-    offset: u64,
-    mut reply: ReplyDirectory,
-  ) {
+  fn opendir(&self, _req: &Request, ino: INodeNo, _flags: OpenFlags, reply: ReplyOpen) {
     let ino_raw = ino.0;
     let path = match self.get_path(ino_raw) {
       Some(p) => p,
@@ -205,7 +205,7 @@ impl Filesystem for AdbFs {
         return;
       }
     };
-    trace!(path = %path, "readdir");
+    trace!(path = %path, "opendir");
 
     let entries = match self.rt.block_on(self.ops.list_dir(&path)) {
       Ok(e) => e,
@@ -236,11 +236,37 @@ impl Filesystem for AdbFs {
       full_entries.push((child_ino, ft, name));
     }
 
-    for (i, (child_ino, ft, name)) in full_entries.iter().enumerate().skip(offset as usize) {
+    let fh = self.next_fh.fetch_add(1, Ordering::Relaxed);
+    self.open_dirs.insert(fh, OpenDir { entries: full_entries });
+    reply.opened(FileHandle(fh), FopenFlags::empty());
+  }
+
+  fn readdir(
+    &self,
+    _req: &Request,
+    _ino: INodeNo,
+    fh: FileHandle,
+    offset: u64,
+    mut reply: ReplyDirectory,
+  ) {
+    let dir = match self.open_dirs.get(&fh.0) {
+      Some(d) => d,
+      None => {
+        reply.error(err(libc::EBADF));
+        return;
+      }
+    };
+
+    for (i, (child_ino, ft, name)) in dir.entries.iter().enumerate().skip(offset as usize) {
       if reply.add(INodeNo(*child_ino), (i + 1) as u64, *ft, name) {
         break;
       }
     }
+    reply.ok();
+  }
+
+  fn releasedir(&self, _req: &Request, _ino: INodeNo, fh: FileHandle, _flags: OpenFlags, reply: ReplyEmpty) {
+    self.open_dirs.remove(&fh.0);
     reply.ok();
   }
 
@@ -770,9 +796,15 @@ pub fn mount(
     mount_options.push(MountOption::CUSTOM(opt));
   }
 
+  let n_threads = std::thread::available_parallelism()
+    .map(|n| n.get())
+    .unwrap_or(4);
+
   let mut config = Config::default();
   config.mount_options = mount_options;
   config.acl = SessionACL::RootAndOwner;
+  config.n_threads = Some(n_threads);
+  config.clone_fd = true;
   fuser::mount2(adbfs, mountpoint, &config)?;
   Ok(())
 }

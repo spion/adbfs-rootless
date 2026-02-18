@@ -12,7 +12,7 @@ fuser = "0.17.0"
 libc = "0.2.182"
 tempfile = "3.25.0"
 thiserror = "2.0.18"
-tokio = { version = "1.49.0", features = ["rt-multi-thread", "process", "macros", "fs", "sync"] }
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "process", "macros", "fs"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
