@@ -75,7 +75,15 @@ impl DeviceOps {
   pub async fn get_metadata(&self, path: &str) -> Result<FileMeta, DeviceError> {
     let escaped = shell_escape_path(path);
     let cmd = format!("ls -l -a -d '{escaped}'");
-    let lines = self.adb.shell(&cmd).await?;
+    let output = self.adb.shell_with_stderr(&cmd).await?;
+
+    // On modern Android, adb shell separates stdout/stderr.
+    // When ls fails, the error message is in stderr, not stdout.
+    let lines = if output.stdout.is_empty() && !output.stderr.is_empty() {
+      &output.stderr
+    } else {
+      &output.stdout
+    };
 
     if lines.is_empty() {
       return Err(DeviceError::NoDevice);

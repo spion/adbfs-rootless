@@ -130,13 +130,30 @@ impl AdbFs {
   }
 
   fn fetch_meta(&self, path: &str) -> Result<FileMeta, DeviceError> {
-    if let Some(meta) = self.cache.get(path) {
-      trace!(path = %path, "cache hit");
-      return Ok(meta);
+    match self.cache.get(path) {
+      Some(Some(meta)) => {
+        trace!(path = %path, "cache hit");
+        return Ok(meta);
+      }
+      Some(None) => {
+        trace!(path = %path, "negative cache hit");
+        return Err(DeviceError::NotFound {
+          path: path.to_string(),
+        });
+      }
+      None => {}
     }
-    let meta = self.rt.block_on(self.ops.get_metadata(path))?;
-    self.cache.insert(path.to_string(), meta.clone());
-    Ok(meta)
+    match self.rt.block_on(self.ops.get_metadata(path)) {
+      Ok(meta) => {
+        self.cache.insert(path.to_string(), Some(meta.clone()));
+        Ok(meta)
+      }
+      Err(e @ DeviceError::NotFound { .. }) => {
+        self.cache.insert(path.to_string(), None);
+        Err(e)
+      }
+      Err(e) => Err(e),
+    }
   }
 }
 
@@ -231,13 +248,18 @@ impl Filesystem for AdbFs {
         .map(|m| mode_to_filetype(m.mode))
         .unwrap_or(FileType::RegularFile);
       if let Some(m) = meta {
-        self.cache.insert(child_path, m);
+        self.cache.insert(child_path, Some(m));
       }
       full_entries.push((child_ino, ft, name));
     }
 
     let fh = self.next_fh.fetch_add(1, Ordering::Relaxed);
-    self.open_dirs.insert(fh, OpenDir { entries: full_entries });
+    self.open_dirs.insert(
+      fh,
+      OpenDir {
+        entries: full_entries,
+      },
+    );
     reply.opened(FileHandle(fh), FopenFlags::empty());
   }
 
@@ -265,7 +287,14 @@ impl Filesystem for AdbFs {
     reply.ok();
   }
 
-  fn releasedir(&self, _req: &Request, _ino: INodeNo, fh: FileHandle, _flags: OpenFlags, reply: ReplyEmpty) {
+  fn releasedir(
+    &self,
+    _req: &Request,
+    _ino: INodeNo,
+    fh: FileHandle,
+    _flags: OpenFlags,
+    reply: ReplyEmpty,
+  ) {
     self.open_dirs.remove(&fh.0);
     reply.ok();
   }
@@ -466,7 +495,7 @@ impl Filesystem for AdbFs {
       Ok(meta) => {
         let ino = self.get_or_assign_ino(&full_path);
         let attr = self.meta_to_attr(ino, &meta);
-        self.cache.insert(full_path, meta);
+        self.cache.insert(full_path, Some(meta));
         reply.entry(&TTL, &attr, Generation(0));
       }
       Err(e) => reply.error(device_err(e)),
@@ -619,7 +648,7 @@ impl Filesystem for AdbFs {
     match self.rt.block_on(self.ops.get_metadata(&path)) {
       Ok(meta) => {
         let attr = self.meta_to_attr(ino_raw, &meta);
-        self.cache.insert(path, meta);
+        self.cache.insert(path, Some(meta));
         reply.attr(&TTL, &attr);
       }
       Err(e) => reply.error(device_err(e)),
@@ -700,7 +729,7 @@ impl Filesystem for AdbFs {
       Ok(meta) => {
         let ino = self.get_or_assign_ino(&full_path);
         let attr = self.meta_to_attr(ino, &meta);
-        self.cache.insert(full_path.clone(), meta);
+        self.cache.insert(full_path.clone(), Some(meta));
 
         let fh = self.next_fh.fetch_add(1, Ordering::Relaxed);
         self.open_files.insert(
@@ -775,7 +804,7 @@ impl Filesystem for AdbFs {
       Ok(meta) => {
         let ino = self.get_or_assign_ino(&full_path);
         let attr = self.meta_to_attr(ino, &meta);
-        self.cache.insert(full_path, meta);
+        self.cache.insert(full_path, Some(meta));
         reply.entry(&TTL, &attr, Generation(0));
       }
       Err(e) => reply.error(device_err(e)),
