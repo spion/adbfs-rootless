@@ -1,4 +1,0 @@
-make
-killall -9 adbfs
-fusermount -u ../testfs
-./adbfs -f $1 ../testfs
