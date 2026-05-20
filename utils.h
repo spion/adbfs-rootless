@@ -55,7 +55,18 @@ using namespace std;
 
 struct fileCache{
     time_t timestamp;
+    string lsOutput;
     string statOutput;
+    bool noStat;
+};
+
+// Didn't tested bellow Android 4.1 alias Jelly Bean
+enum coreutils_type {
+    UNKOWN,
+    TOOLBOX_OLD, // Android 4.1 (Jelly Bean) -> 4.3 (Jelly Bean)
+    TOOLBOX, // Android 4.4 (KitKat) -> Android 5.1 (Lolipop)
+    TOYBOX, // Android 6 (Marshmallow) -> now
+    BUSYBOX, // if custom
 };
 
 queue<string> exec_command(const string&);
@@ -177,33 +188,4 @@ queue<string> exec_command(const string& command)
     pclose( fp );
 
     return output;
-}
-
-/**
-   Convert timespec to touch parameter format
-
-   gnu_format allows to specify up to nanoseconds.
-   https://www.gnu.org/software/coreutils/manual/html_node/General-date-syntax.html
-   Toybox's touch used on Android supports the GNU extension for the nanoseconds since 0.8.1 : "@%s.%N"
-   Toybox was begin used instead of Busybox in Android 6.
-
-   @param t the time to be converted
-   @param gnu_format if touch supports GNU time format
- */
-static string format_touch_time(const struct timespec& t, bool gnu_format) {
-    ostringstream ss;
-    if (gnu_format) {
-        ss << "@"
-            << t.tv_sec
-            << "."
-            << setw(9) << setfill('0') << t.tv_nsec;
-        return ss.str();
-    } else {
-        // It could be possible to convert here the timezone instead of creating a more complex shell comamand.
-        ss << "`date -ud "
-            << "@" << t.tv_sec  << "."
-            << setw(9) << setfill('0') << t.tv_nsec
-            << " +%Y-%m-%dT%H:%M:%S`";
-    }
-    return ss.str();
 }
