@@ -1,5 +1,6 @@
-CXXFLAGS=-Wall $(shell pkg-config fuse --cflags)
-LDFLAGS=-Wall $(shell pkg-config fuse --libs)
+FUSE_PKG ?= fuse
+CXXFLAGS=-Wall $(if $(filter fuse-t,$(FUSE_PKG)),-D_FILE_OFFSET_BITS=64) $(shell pkg-config $(FUSE_PKG) --cflags)
+LDFLAGS=-Wall $(shell pkg-config $(FUSE_PKG) --libs)
 
 TARGET=adbfs
 DESTDIR?=/
