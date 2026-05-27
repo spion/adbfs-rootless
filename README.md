@@ -39,10 +39,21 @@ Have fun!
 
 ## MacOS
 
-Install adb and fuse
+Install adb and fuse. You have two options for FUSE:
+
+**Option A: macfuse**
 
     brew install --cask android-platform-tools
     brew install --cask macfuse
+
+**Option B: fuse-t**
+
+    brew install --cask android-platform-tools
+    brew install macos-fuse-t/homebrew-cask/fuse-t
+
+If using fuse-t, build with:
+
+    make FUSE_PKG=fuse-t
 
 Check access to phone through adb
 
