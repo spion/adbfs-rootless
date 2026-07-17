@@ -105,3 +105,20 @@ Then `killall -9 adb; fusermount -u /media/mount/path` before trying again.
 
 [enable-usb-debug]: http://www.droidviews.com/how-to-enable-developer-optionsusb-debugging-mode-on-devices-with-android-4-2-jelly-bean/
 [error-device-offline]: http://stackoverflow.com/questions/10680417/error-device-offline
+
+### Error: more than one device/emulator
+
+If you have multiple android devices connected, but need to mount the specific one. First find the ID of needed device:
+
+```
+adb devices
+List of devices attached
+emulator-555	device
+347349873487    device
+```
+
+Then specify it during mount:
+
+```
+ADBFS_ADB_ARGS="-s 347349873487" ./adbfs ~/droid
+```

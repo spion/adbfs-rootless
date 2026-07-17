@@ -171,7 +171,14 @@ queue<string> adb_shell(const string& command, bool getStderr = false)
     string actual_command;
     actual_command.assign(command);
     //adb_shell_escape_command(actual_command);
-    actual_command.insert(0, "adb shell \"");
+
+    char *adbExtraOpts = getenv("ADBFS_ADB_ARGS");
+    if ( adbExtraOpts != NULL && strlen(adbExtraOpts) > 0 ) {
+        actual_command.insert(0, std::string("adb ") + std::string(adbExtraOpts) + std::string(" shell \""));
+    } else {
+        actual_command.insert(0, "adb shell \"");
+    }
+
     actual_command.append("\"");
     if (getStderr) actual_command.append(" 2>&1");
     return exec_command(actual_command);
@@ -268,7 +275,13 @@ void makeTmpDir(void) {
 void adb_push_pull_cmd(string& cmd, const bool push,
 		       const string& local_path, const string& remote_path)
 {
-    cmd.assign("adb ");
+    char *adbExtraOpts = getenv("ADBFS_ADB_ARGS");
+    if ( adbExtraOpts != NULL && strlen(adbExtraOpts) > 0 ) {
+        cmd.assign(std::string("adb ") + std::string(adbExtraOpts) + std::string(" "));
+    } else {
+        cmd.assign("adb ");
+    }
+
     cmd.append((push ? "push '" : "pull '"));
     cmd.append((push ? local_path : remote_path));
     cmd.append("' '");
